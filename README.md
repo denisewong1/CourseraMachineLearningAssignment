@@ -1,0 +1,2 @@
+# CourseraMachineLearningAssignment
+Human Activity Prediction Assignment
