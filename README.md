@@ -13,7 +13,7 @@ Class A corresponds to the specified execution of the exercise, while the other 
 ## Data
 The data for this project comes from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. 
 
-The machine learning algorithms used were
-1/ linear discriminant analysis - 69.1% accuracy on training set, 68.1% accuracy on test set
-2/ gradient boosting model - 99.2% accuracy on the training set, 98.8% accuracy on the test set
-The GBM model was used to generate the predictions on the unseen data set for the quiz.
+The machine learning algorithms used were  
+1/ linear discriminant analysis - 69.1% accuracy on training set, 68.1% accuracy on test set  
+2/ gradient boosting model - 99.2% accuracy on the training set, 98.8% accuracy on the test set  
+The GBM model was used to generate the predictions on the unseen data set for the quiz.  
