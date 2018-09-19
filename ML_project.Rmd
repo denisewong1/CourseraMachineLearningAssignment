@@ -1,0 +1,148 @@
+---
+title: "Predicting Quality of Human Activity from Accelerometer Data using Machine Learning Techniques"
+author: "Denise Wong"
+date: "19 September 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Executive Summary  
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+The goal of this machine learning project is to use a training data set from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict quality of barbell lifts for a separate unseen test data set. 
+More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Overview of the Training Dataset  
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).  
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate. The exercises were performed by six male participants aged between 20-28 years, with little weight lifting experience. We made sure that all participants could easily simulate the mistakes in a safe and controlled manner by using a relatively light dumbbell (1.25kg).  
+
+## Creating the Prediction Model
+#### Initial settings
+Load the relevant library packages and the training and test data set.
+```{r}
+library(skimr)
+library(ggplot2)
+library(caret)
+library(rattle)
+library(corrplot)
+dirDest <- "~/Coursera"
+fileTrain <- "pml-training.csv"
+fileTestQuiz <- "pml-testing.csv"
+setwd(dirDest)
+dataTrain <- read.csv(fileTrain)
+dataTestQuiz <- read.csv(fileTestQuiz)
+```
+
+
+## Exploratory Data Analysis  
+The data comprises 19622 observations of 160 variables.  Notably (1) there is quite a lot of missing data (2) the first 6 columns of the data set are id type variables and (3) the target output is in the last column.  There are sufficient observations to create a meaningful train/test data split for this project.
+```{r}
+str(dataTrain)
+```
+
+#### Splitting the Data   
+The data is partitioned into training and test data sets, according to the participant to ensure a uniform distribution of users in each data set.  
+```{r}
+set.seed(7129) 
+inTrain <- createDataPartition(dataTrain$user_name,p=0.7,list=FALSE)
+dataTest <- dataTrain[-inTrain,]; dataTrain <- dataTrain[inTrain,]
+dim(dataTest); dim(dataTrain)
+```
+
+#### Set aside the ID variables
+The id variables are set aside to make it easier to analyse the continuous data variables. 
+```{r}
+idTrain <- dataTrain[,1:6] 
+idTest <- dataTest[,1:6];idTestQuiz <- dataTestQuiz[,1:6]
+dataTrain[,1:6] <- NULL
+dataTest[,1:6] <- NULL; dataTestQuiz[,1:6]<-NULL
+```
+
+
+#### Near Zero Variance Analysis  
+The analysis removes predictors with a small number of unique values.  Note that the analysis is performed only on the training data set but the removal of variables is applied to all data sets.   
+```{r}
+lstNZV <- nearZeroVar(dataTrain, saveMetrics = TRUE)
+lstNZV
+lstDelete <- (lstNZV$nzv == TRUE)
+dataTrain[,lstDelete]<-NULL 
+dataTest[,lstDelete]<-NULL; dataTestQuiz[,lstDelete]<-NULL
+```
+
+
+#### Missing Data Analysis  
+The analysis shows that there are columns where the same number of data points is missing.  Given that the missing data is more than 80% of the observations, these columns are removed from the analysis.  Note that the analysis is performed only on the training data set but the deletion is applied to all data sets.  
+```{r}
+skimmed <- skim_to_wide(dataTrain)
+cbind(skimmed$variable,skimmed$complete,skimmed$n)
+lstDelete <- skimmed$variable[as.integer(skimmed$complete)<0.2*13738]
+dataTrain[,lstDelete]<-NULL 
+dataTest[,lstDelete]<-NULL; dataTestQuiz[,lstDelete]<-NULL
+```
+
+#### Linear Dependencies  
+The analysis shows that there are no variables which are linear combinations of other variables.  
+```{r}
+dataVar<- dataTrain[,1:53]
+findLinearCombos(dataVar)
+```
+
+#### Highly Correlated Variables  
+The analysis looks for highly correlated variables.  There is a large number of variables which makes visual inspection difficult and hence I've commented out the code for it. Note that the analysis is performed only on the training data set but the deletion is applied to all data sets.  
+```{r}
+dataVar<- dataTrain[,1:53]
+corrTable <- cor(dataVar)
+##corrplot(corrTable, method = "color", order = "FPC",
+##         addCoef.col = "white",number.digits = 2, number.cex = 0.75)
+corrHigh <- findCorrelation(corrTable,cutoff = 0.9)
+lstDelete <- names(dataVar[,corrHigh])
+lstDelete
+dataTrain[,lstDelete]<-NULL 
+dataTest[,lstDelete]<-NULL; dataTestQuiz[,lstDelete]<-NULL
+dim(dataTrain)
+```
+
+Following the Exploratory Data Analysis, we are left with 46 variables to use as predictors for the machine learning algorithm.  
+
+
+## Creating the Prediction Model  
+The machine learning algorithms I will investigate for this classification problem are the (1) linear discriminant model (2) gradient boosting model. While the random forest produced a perfect result on the training set, it was omitted from the write-up of the assignment as it took too long to run and knit the rmd file.  
+To limit overfitting and improve model efficiency, we will use cross-validation with 5 folds.  
+```{r}
+trControl <- trainControl(method="cv",number=5)
+```
+
+### Linear Discriminant Analysis  
+The LDA has an accuracy of 69.1% on the training data set and 68.1% on the test data set.  
+```{r}
+model_lda <- train(classe~.,data=dataTrain,method="lda",trControl=trControl)
+confusionMatrix(predict(model_lda,newdata=dataTrain),dataTrain$classe)
+```
+
+```{r}
+confusionMatrix(predict(model_lda,newdata=dataTest),dataTest$classe)
+```
+
+#### Gradient Boosting Model  
+The GBM has an accuracy of 99.2% on the training data set and 98.8% on the test data set.  
+```{r}
+model_gbm <- train(classe~.,data=dataTrain,method="gbm",trControl=trControl,verbose=FALSE)
+confusionMatrix(predict(model_gbm,newdata=dataTrain),dataTrain$classe)
+```
+
+```{r}
+confusionMatrix(predict(model_gbm,newdata=dataTest),dataTest$classe)
+```
+
+
+## Conclusion and Quiz Predictions
+The GBM produced superior results for both the training and test data set.  This algorithm was used to predict the results for the quiz test data set.
+
+```{r}
+predict(model_gbm,newdata=dataTestQuiz)
+```
+
+
+
